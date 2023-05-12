@@ -1,0 +1,10 @@
+<service>
+  <id>ExellioOle2Http</id>
+  <name>ExellioOle2Http</name>
+  <description>ExellioOle2Http service</description>
+  <executable>exellioOle2Http.exe</executable>
+  <arguments></arguments>
+  <logpath>.\logs</logpath>
+  <log mode="roll" />
+  <onfailure action="restart" />
+</service>

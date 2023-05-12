@@ -1,0 +1,1 @@
+pkg app.js --targets win-x64 --output ./builds/build-win64/exellioOle2Http.exe

@@ -1,0 +1,33 @@
+{
+  "name": "exellioOle2Http",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js",
+    "start-prod": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StreamLV/exellioOle2http.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/StreamLV/exellioOle2http/issues"
+  },
+  "homepage": "https://github.com/StreamLV/exellioOle2http#readme",
+  "dependencies": {
+    "axios": "^0.24.0",
+    "crypto": "^1.0.1",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "iconv": "^3.0.1",
+    "node-schedule": "^2.1.0",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}
