@@ -4,7 +4,13 @@
   <description>ExellioOle2Http service</description>
   <executable>exellioOle2Http.exe</executable>
   <arguments></arguments>
-  <logpath>.\logs</logpath>
-  <log mode="roll" />
+  <logpath>%BASE%\logs</logpath>
+    <redirectError>true</redirectError>
+  <log mode="roll-by-size-time">
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
   <onfailure action="restart" />
 </service>

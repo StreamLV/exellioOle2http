@@ -3,9 +3,22 @@ const axios = require('axios');
 const express = require('express');
 // const net = require('net');
 // require('dotenv');
-//
+
 const configService = require('./config/config-service');
 const config = configService.getConfig();
+const configFr = configService.getConfigFr();
+//
+const winax = require('winax');
+try {
+  const fpOleObject = new winax.Object('ExellioFP.FiscalPrinter');  
+  //const fpOleObject = new winax.Object('com.sun.star.ServiceManager');
+  console.log('winax', 'CREATED!');
+  //fpOleObject.ArtTablesDir = configFr.workDirectory;
+  //console.log('WorkDirWriteRights', fpOleObject.CheckWorkDirWriteRights());  
+} catch (error) {
+  console.log('Ole error', error.message);
+}
+//
 
 //const scheduleService = require('./services/schedule-service');
 
@@ -42,5 +55,6 @@ app.use((req, res, next) => {
     .json({ status: 'error', message: 'could not find this route' });
 });
 
-console.log('port', config.port);
+console.log('app started with config:', { config, configFr });
+//console.log('port', config.port);
 app.listen(config.port);
