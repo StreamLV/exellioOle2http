@@ -1,0 +1,16 @@
+<service>
+  <id>ExellioOle2Http</id>
+  <name>ExellioOle2Http</name>
+  <description>ExellioOle2Http service</description>
+  <executable>exellioOle2Http32.exe</executable>
+  <arguments></arguments>
+  <logpath>%BASE%\logs</logpath>
+    <redirectError>true</redirectError>
+  <log mode="roll-by-size-time">
+    <pattern>yyyyMMdd</pattern>
+    <autoRollAtTime>00:00:00</autoRollAtTime>
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <onfailure action="restart" />
+</service>
