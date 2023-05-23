@@ -208,8 +208,8 @@ const opSaleReturn = (opData) => {
 			fpOleObject.Total(undefined, 1, 0); // Сплата готівкою
 			resPayment = checkOpResult(Объект, "TotalCash3");	
         } else {						
-			fpOleObject.Total(undefined, 4, СуммаБезнал);  // Сплата платіжною картою 
-			fpOleObject.Total(undefined, 1, СуммаНал);  // Сплата готівкою
+			fpOleObject.Total(undefined, 4, opData.sumNonCash);  // Сплата платіжною картою 
+			fpOleObject.Total(undefined, 1, opData.sumCash);  // Сплата готівкою
 			resPayment = checkOpResult("TotalCashCard");		
         };
 		if (!resPayment) {
