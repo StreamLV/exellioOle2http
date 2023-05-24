@@ -29,6 +29,7 @@ const checkSetOleDbObject = () => {
         } catch (error) {
             console.log('Ole error', error.message);
             errorMessageConnect = error.message;
+            errorMessage = errorMessageConnect;
             isSuccess = false;
         }
     }
@@ -58,16 +59,13 @@ const openPort = () => {
         return false;
     }
 
-    //ПарольАдминистратораККМ = "0000";
-	//ПарольКассираККМ = "0000";
-
 	fpOleObject.Debugger(true);  // ввімкнути протоколювання роботи драйверу в файл ExellioFP.log
 	//fpOleObject.SetReadTimeout(timeout); // Встановити Таймаут читання для роботи в термінальному режиму
     //
     fpOleObject.OpenPort(configFr.serialConfig.port, configFr.serialConfig.speed);
     //
 	if (checkOpResult("OpenPort")) {
-        serialNumber = fpOleObject.s6;  
+        serialNumber = Number(fpOleObject.s6);  
         return true;
     }else {
         fpOleObject.ClosePort();
@@ -86,6 +84,7 @@ const sendCommandInfo = async (req, res, next) => {
     configFr: configFr,
     errorMessageConnect,
     errorMessage,
+    errorSource,
     pathWorkDir: configService.pathWorkDir,
     workDirWriteRights: fpOleObject ? fpOleObject.CheckWorkDirWriteRights(): 'null'
   });
@@ -94,31 +93,36 @@ const sendCommandInfo = async (req, res, next) => {
 const sendCommand = async (req, res, next) => {
     
     checkSetOleDbObject();
+    let resData;
+    console.log('sendCommand->Data', (req.body));
     switch (req.body.command) {
         case 'saleReturn':
-            opSaleReturn(req.body.data);
+            resData = opSaleReturn(req.body.data);
             break;
-        case 'putgetmoney':
-            opPutGetMoney(req.body.data);
+        case 'cashInOut':
+            resData = opCashInOut(req.body.data);
             break;
         // case 'openshift':
         //     // openshift
         //     break;
+        case 'shiftStatus':
+            // resData = opCashInOut(req.body.data);
+            break;
         case 'zreport':
-            opZReport(req.body.data);
+            resData = opZReport(req.body.data);
             break;
         case 'xreport':
-            opXReport(req.body.data);
+            resData = opXReport(req.body.data);
             break;
         default:
-            console.log(`Unknown command ${req.body.command}.`);
+            errorMessage = `Unknown command ${req.body.command}.`;
+            resData = { 
+                isError: true,
+                errorMessage
+            };
+            console.log('sendCommand', errorMessage);
     }
-    
-    res.json({
-      status: 'ok',
-      message: 'exellioOle2Http server is up',
-      configFr: configFr,
-    });
+    res.json(resData);
   };
 
 /**
@@ -128,16 +132,17 @@ const sendCommand = async (req, res, next) => {
  * @param {boolean} opData.isReturn - признак, що це чек повернення
  * @param {number} opData.sumCash - сума готівкою
  * @param {number} opData.sumNonCash - сума карткою
+ * @param {string} opData.uuid - унікальний id чеку 
  * @param {number} opData.cashierPassword - пароль касиру ккм
  * @param {Array.<{code: string, name: string, price: number, qty: number, tax: number, discount: number}>} opData.products - таблиця товарів для пробиття
- * @returns {Type} - повертає результат
+ * @returns {Object} - повертає объект з результатом
  */
 const opSaleReturn = (opData) => {
 
     const isFiscalReceipt = true;
 
-    let shiftNumber = '';
-    let receiptNumber = '';
+    let shiftNumber;
+    let receiptNumber;
     
     //////////////////////////////////////////////////////////////////////////////////////////////////
     //openPort
@@ -164,19 +169,27 @@ const opSaleReturn = (opData) => {
         // Якщо помилка відкриття чеку
 		if (!checkOpResult(currentOp)) {
             fpOleObject.ClosePort(); 	//закриваємо порт
-            //Результат = мОшибкаНеизвестно;
+            console.log(currentOp, errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            };
         } else {
             fpOleObject.GetDayInfo(); // Читаємо інформацію з ККМ про НомерЗміни
             if (checkOpResult("GetDayInfo")) {
-                shiftNumber = Число(fpOleObject.s9) + 1;
+                shiftNumber = Number(fpOleObject.s9) + 1;
             };
             fpOleObject.GetLastReceiptNum();  // Читаємо інформацію з ККМ про НомерЧеку
             if (checkOpResult("GetLastReceiptNum")) {
-                receiptNumber = Число(fpOleObject.s1) + 1;	
+                receiptNumber = Number(fpOleObject.s1) + 1;	
             };
         };
     } else {
-        console.log('conncetion error');
+        console.log('openPort', errorMessage);
+        return {
+            isError: true,
+            errorMessage
+        };
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,7 +202,12 @@ const opSaleReturn = (opData) => {
         if (!checkOpResult('SaleWC', saleRes)) {
             fpOleObject.CancelReceipt(); //відміна чеку
             fpOleObject.ClosePort();
-            break;
+            console.log('SaleWC', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            };
+            //break;
         }
     }
     
@@ -214,6 +232,11 @@ const opSaleReturn = (opData) => {
         };
 		if (!resPayment) {
 			fpOleObject.CancelReceipt(); //відміна чеку
+            console.log('Total', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            };
         };	
 	};
 
@@ -221,150 +244,168 @@ const opSaleReturn = (opData) => {
 		fpOleObject.CloseFiscalReceipt(); // Закриття фіскального чеку
 		if (!checkOpResult("CloseFiscalReceipt")) {
             fpOleObject.CancelReceipt(); //відміна чеку	
+            console.log('CloseFiscalReceipt', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            }
         };	
     } else {
 		fpOleObject.CloseNonfiscalReceipt(); // Закриття нефіскального чеку (чека коментарів)
 		if (!checkOpResult("CloseNonfiscalReceipt")) {
             fpOleObject.CancelReceipt(); //відміна чеку	
+            console.log('CloseNonfiscalReceipt', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            }
         };	
 	};
-
+    console.log('opSaleReturn->success');
+    return {
+        isError: false,
+        errorMessage: '',
+        data: { receiptNumber, shiftNumber }
+    };
 }
 
-const opPutGetMoney = (opData) => {
-    Результат  = мНетОшибки;
+/**
+ * Виконує внесення та винесення коштів
+ *
+ * @param {Object} opData - об'єкт з даними який передаємо
+ * @param {number} opData.sum - сума внесення / винесення
+ * @param {number} opData.cashierPassword - пароль касиру ккм
+ * @returns {Object} - повертає результат
+ */
+const opCashInOut = (opData) => {
 	
-	Если ОткрытьПорт(Объект, Объект.Параметры) = мНетОшибки Тогда
-		Объект.Драйвер.InOut(Сумма);
-		Если Не ПроверитьРезультатС(Объект, "InOut") Тогда
-			Результат = мОшибкаНеизвестно;
-		КонецЕсли;
-		Объект.Драйвер.OpenDrawer(); // Открытие денежного ящика
-        Объект.Драйвер.ClosePort(); // Закрытие СОМ-порта
-	Иначе
-		Результат = мОшибкаПриПодключении;		
-	КонецЕсли;
+	if (openPort()) {
+		fpOleObject.InOut(opData.sum);
+		if (!checkOpResult('InOut')) {
+			console.log('InOut', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            }
+        };
+		fpOleObject.OpenDrawer(); // відкриття грошового ящику
+        fpOleObject.ClosePort(); // Закриття СОМ-порту
+    } else {
+        console.log('openPort', errorMessage);
+        return {
+            isError: true,
+            errorMessage
+        }
+    }
 		
-	Возврат Результат;
+	console.log('opCashInOut->success');
+    return {
+        isError: false,
+        errorMessage: ''
+    };
 }
 
 const opZReport = (opData) => {
-    Результат          = мНетОшибки;
 	
-	Если ОткрытьПорт(Объект, Объект.Параметры) = мНетОшибки Тогда
-			// Проверка наличия открытого фискального чека в ККМ
-		 	Если Объект.Драйвер.IsFiscalOpen Тогда
-				Объект.Драйвер.CancelReceipt(); //Отмена незавершенного чека ККМ
-			КонецЕсли;
-			
-			
-			Ф = ПолучитьФорму("НастройкиОтчета");
-			Ф.ЧтоТоИзменилось = Ложь;
-			Ф.фПоКЛ = Истина;
-			
-			Объект.Драйвер.GetSettingValue(5); // чтение настройки "печать уменьшенным шрифтом"			
-			Ф.фМШ = Булево(Число(Объект.Драйвер.S1)); 
-			
-			//Объект.Драйвер.GetSettingValue(7); // чтение настройки "печатать отчеты на контрольной ленте"
-			//Ф.фПоКЛ = Не Булево(Число(Объект.Драйвер.S1)); 
-						
-			Ф.ЭлементыФормы.фПоКЛ.Доступность = Ложь;
-			
-			
-			Если Ф.ОткрытьМодально() <> КодВозвратаДиалога.ОК Тогда
-				Возврат	мОшибкаНеизвестно;		
-			КонецЕсли;	
+    let receiptNumber;
+    let shiftNumber;
 
-			Если Ф.ЧтоТоИзменилось Тогда				
-				Объект.Драйвер.EnableSmallFont(Ф.фМШ);
-				//Объект.Драйвер.EnableCRReport(Ф.фПоКЛ);
-			КонецЕсли;
+	if (openPort()) {
+		// Перевірка наявності відкритого фіскального чеку в ККМ
+		if (fpOleObject.IsFiscalOpen) {
+            fpOleObject.CancelReceipt(); //Відміна незакінченного чеку ККМ
+        };
 			
+        //fpOleObject.GetSettingValue(5); // читання налаштування "друк зменшеним шрифтом"			
+		//const smallFontMode = fpOleObject.S1; 
+		//	
+		//fpOleObject.GetSettingValue(7); // читання налаштування "друкувати звіти на контрольній стрічці"
+        //const printControlStrike = (!fpOleObject.S1); 
+		//				
+		fpOleObject.EnableSmallFont(true);
+		//fpOleObject.EnableCRReport(true);
 			
-			Объект.Драйвер.ZReportWC(ПарольАдминистратораККМ); // Печать Z-отчета, очистка таблицы артикулов, удаление всех артикулов из ФР	
-			Если Не ПроверитьРезультатС(Объект, "ZОтчет") Тогда
-				Результат = мОшибкаНеизвестно;
-			Иначе
-				Объект.Драйвер.GetDayInfo(); // Читаем информацию из ККМ о НомереЧека и НомереСмены
-				Если Не ПроверитьРезультатС(Объект, "GetDayInfo") Тогда
-					   НомерЧека = Число(Объект.Драйвер.s6)+1;
-					   НомерСмены = Число(Объект.Драйвер.s9)+1;
-		        КонецЕсли;
-				//Объект.Драйвер.DelArticle(ПарольАдминистратораККМ,0); // Удаление ВСЕХ запрограммированных артикулов в регистраторе
-				//ОчиститьАртикулы();
-			КонецЕсли;
-			
-			Если Ф.ЧтоТоИзменилось Тогда
-				Если Не Ф.ФЗаписать Тогда
-					Объект.Драйвер.EnableSmallFont(Не Ф.фМШ);	
-				КонецЕсли
-			КонецЕсли;
-			
-			Объект.Драйвер.OpenDrawer(); // Открытие денежного ящика
-			Объект.Драйвер.ClosePort();
-	Иначе
-			Результат = мОшибкаПриПодключении;		
-	КонецЕсли;
-	Возврат Результат;
+		fpOleObject.ZReportWC(frAdminPassword); // Друк Z-звіту, очистка таблиці артикулів, видалення всіх артикулів з ФР	
+		if (!checkOpResult('ZReportWC')) {
+			console.log('ZReportWC', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            }
+        } else {
+			fpOleObject.GetDayInfo(); // Читаємо інформацію з ККМ про НомереЧеку и НомереЗміни
+			if (!checkOpResult('GetDayInfo')) {
+				receiptNumber = Number(fpOleObject.s6) + 1;
+				shiftNumber = Number(fpOleObject.s9) + 1;
+                console.log('GetDayInfo->error', errorMessage);
+            };
+			//fpOleObject.DelArticle(frAdminPassword,0); // Видалення ВСІХ запрограмованих артикулів в регістраторі
+        };
+		//	
+		fpOleObject.EnableSmallFont(false);
+		//	
+		fpOleObject.OpenDrawer(); // Відкриття грошового ящику
+		fpOleObject.ClosePort();
+    } else {
+		console.log('openPort', errorMessage);
+        return {
+            isError: true,
+            errorMessage
+        }		
+	};
+	console.log('opZReport->success');
+    return {
+        isError: false,
+        errorMessage: ''
+    };
 }
 
 const opXReport = (opData) => {
-    Результат = мНетОшибки;
+    
+    let receiptNumber;
+    let shiftNumber;
 	
-	Если ОткрытьПорт(Объект, Объект.Параметры) = мНетОшибки Тогда
-			// Проверка наличия открытого фискального чека в ККМ
-		 	Если Объект.Драйвер.IsFiscalOpen Тогда
-				Объект.Драйвер.CancelReceipt(); //Отмена незавершенного чека ККМ
-			КонецЕсли;
-			
-			Ф = ПолучитьФорму("НастройкиОтчета");
-			Ф.ЧтоТоИзменилось = Ложь;
-			
-			Объект.Драйвер.GetSettingValue(5); // чтение настройки "печать уменьшенным шрифтом"
-			//Сообщить(Объект.Драйвер.S1);
-			
-			Ф.фМШ = Булево(Число(Объект.Драйвер.S1)); 
-			
-			Объект.Драйвер.GetSettingValue(7); // чтение настройки "печатать отчеты на контрольной ленте"
-			//Сообщить(Объект.Драйвер.S1);
-			
-			Ф.фПоКЛ = Не Булево(Число(Объект.Драйвер.S1)); 
+	if (openPort()) {
+		// Перевірка наявності відкритого фіскального чеку в ККМ
+		if (fpOleObject.IsFiscalOpen) {
+			fpOleObject.CancelReceipt(); //Відміна незакінченого чеку ККМ
+        };
 
-			
-			Если Ф.ОткрытьМодально() <> КодВозвратаДиалога.ОК Тогда
-				Возврат	мОшибкаНеизвестно;		
-			КонецЕсли;	
-
-			Если Ф.ЧтоТоИзменилось Тогда
-				//Сообщить("ЧтоТоИзменилось");
-				Объект.Драйвер.EnableSmallFont(Ф.фМШ);
-				Объект.Драйвер.EnableCRReport(Ф.фПоКЛ);
-			КонецЕсли;
-			
-			Объект.Драйвер.XReport(ПарольАдминистратораККМ); // Печать Х-отчета
-			Если Не ПроверитьРезультатС(Объект, "XReport") Тогда
-				Результат = мОшибкаНеизвестно;
-			Иначе
-				Объект.Драйвер.GetDayInfo(); // Читаем информацию из ККМ о НомереЧека и НомереСмены
-				Если Не ПроверитьРезультатС(Объект, "GetDayInfo") Тогда
-					   НомерЧека = Число(Объект.Драйвер.s6) + 1;
-					   НомерСмены = Число(Объект.Драйвер.s9) + 1;
-		        КонецЕсли;
-			КонецЕсли;
-			
-			Если Ф.ЧтоТоИзменилось Тогда
-				Если Не Ф.ФЗаписать Тогда
-					Объект.Драйвер.EnableSmallFont(Не Ф.фМШ);
-					Объект.Драйвер.EnableCRReport(Не Ф.фПоКЛ);
-				КонецЕсли;
-			КонецЕсли;
-
-			
-			Объект.Драйвер.ClosePort();
-	Иначе
-			Результат = мОшибкаПриПодключении;		
-	КонецЕсли;
-	Возврат Результат;
+		fpOleObject.EnableSmallFont(true);
+		fpOleObject.EnableCRReport(true);
+		//	
+		fpOleObject.XReport(frAdminPassword); // Друк Х-звіту
+        //
+		if (!checkOpResult('XReport')) {
+			console.log('XReport', errorMessage);
+            return {
+                isError: true,
+                errorMessage
+            }
+        } else {
+			fpOleObject.GetDayInfo(); // Читаємо информацію з ККМ про НомереЧеку та НомерЗміни
+			if (!checkOpResult('GetDayInfo')) {
+			    receiptNumber = Number(fpOleObject.s6) + 1;
+				shiftNumber = Number(fpOleObject.s9) + 1;
+            };
+			//
+			fpOleObject.EnableSmallFont(false);
+			fpOleObject.EnableCRReport(false);
+            //
+			fpOleObject.ClosePort();
+        }
+    } else {
+		console.log('openPort', errorMessage);
+        return {
+            isError: true,
+            errorMessage
+        }		
+	};
+	console.log('opXReport->success');
+    return {
+        isError: false,
+        errorMessage: ''
+    };
 }
 
 exports.sendCommandInfo = sendCommandInfo;
