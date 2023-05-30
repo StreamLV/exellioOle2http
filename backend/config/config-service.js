@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const pathConfig = path.join(process.cwd(), 'config.json');
-const pathWorkDir = path.join(process.cwd(), 'frCategory');
+// let pathWorkDir = path.join(process.cwd(), 'frCategory');
+// if (!fs.existsSync(path)) {
+//   pathWorkDir = path.join(process.cwd(), '..', '..', 'frCategory');
+// }
 const configExist = fs.existsSync(pathConfig);
 const config = require('./config');
 let configData;
@@ -27,4 +30,4 @@ const getConfigFr = () => {
 
 exports.getConfig = getConfig;
 exports.getConfigFr = getConfigFr;
-exports.pathWorkDir = pathWorkDir;
+// exports.pathWorkDir = pathWorkDir;

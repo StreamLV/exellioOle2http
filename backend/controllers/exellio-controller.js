@@ -23,7 +23,7 @@ const checkSetOleDbObject = () => {
         try {
             fpOleObject = new winax.Object('ExellioFP.FiscalPrinter');  
             console.log('winax ole created!');
-            fpOleObject.ArtTablesDir = configService.pathWorkDir;
+            //fpOleObject.ArtTablesDir = configService.pathWorkDir;
             //console.log('WorkDirWriteRights', fpOleObject.CheckWorkDirWriteRights());
             isSuccess = true;  
         } catch (error) {
@@ -37,20 +37,16 @@ const checkSetOleDbObject = () => {
 }
 
 const checkOpResult = (errorSourceOp = '', opResult = null) => {
-    if (opResult || fpOleObject.LastError == 0) {
-		errorMessage = ''
-		return true;	
-	}else {
-	    if (opResult == 0) {
-		    errorMessage = '';
-            errorSource = '';
-		    return true;
-        }else {
-		    errorMessage = opResult.LastErrorText; 
-		    errorSource = errorSourceOp;
-		    return false;
-        }
-    };
+    
+    currentLastError = (opResult === null) ? fpOleObject.LastError : opResult;
+    errorSource = '';
+    if (currentLastError == 0) {
+        errorMessage = ''
+        return true;
+    }
+    errorMessage = (currentLastError == 7) ? fpOleObject.LastErrorText : fpOleObject.GetErrorMessage(currentLastError);
+    errorSource = errorSourceOp;
+    return false;
 };
 
 const openPort = () => {
@@ -77,17 +73,23 @@ const openPort = () => {
 const sendCommandInfo = async (req, res, next) => {
     
     checkSetOleDbObject();
-    //
+    const workDir = {
+        path: fpOleObject.ArtTablesDir,
+        writeRights: fpOleObject ? fpOleObject.CheckWorkDirWriteRights(): null
+    };
     res.json({
-    status: 'ok',
-    message: 'exellioOle2Http server is up',
-    configFr: configFr,
-    errorMessageConnect,
-    errorMessage,
-    errorSource,
-    pathWorkDir: configService.pathWorkDir,
-    workDirWriteRights: fpOleObject ? fpOleObject.CheckWorkDirWriteRights(): 'null'
-  });
+        isError: (errorMessage !== ''),
+        errorMessage,
+        errorSource,
+        workDir,
+        configFr
+    });
+};
+
+const sendCommandStatus = async (req, res, next) => {
+    
+    res.json(opStatus());
+    
 };
 
 const sendCommand = async (req, res, next) => {
@@ -125,6 +127,33 @@ const sendCommand = async (req, res, next) => {
     res.json(resData);
   };
 
+  const opStatus = () => {
+	
+	checkSetOleDbObject();
+    const workDir = {
+        path: fpOleObject.ArtTablesDir,
+        writeRights: fpOleObject ? fpOleObject.CheckWorkDirWriteRights(): null
+    };
+    //
+    let shiftNumber;
+    let receiptNumber;
+    if (openPort()) {
+        // Якщо помилка відкриття чеку
+        fpOleObject.GetDayInfo(); // Читаємо інформацію з ККМ про НомерЗміни
+        if (checkOpResult("GetDayInfo")) {
+            shiftNumber = Number(fpOleObject.s9) + 1;
+        };
+        fpOleObject.GetLastReceiptNum();  // Читаємо інформацію з ККМ про НомерЧеку
+        if (checkOpResult("GetLastReceiptNum")) {
+            receiptNumber = Number(fpOleObject.s1) + 1;	
+        };
+        fpOleObject.ClosePort();
+        return { isError: false, errorMessage, errorSource, workDir, data: { shiftNumber, receiptNumber }, configFr };
+    } else {
+        return { isError: true, errorMessage, errorSource, workDir, configFr };
+    }
+}
+
 /**
  * Виконує створення та фіскалізацію чека, як для продажі так і для повернення
  *
@@ -154,7 +183,7 @@ const opSaleReturn = (opData) => {
 		};
         let currentOp = '';
         if (isFiscalReceipt) {
-            if (!isReturn) { 
+            if (!opData.isReturn) { 
                 fpOleObject.OpenFiscalReceipt(1, opData.cashierPassword, 1); // Відкриття чеку продаж
                 currentOp = 'OpenFiscalReceipt';
             } else {
@@ -410,3 +439,4 @@ const opXReport = (opData) => {
 
 exports.sendCommandInfo = sendCommandInfo;
 exports.sendCommand = sendCommand;
+exports.sendCommandStatus = sendCommandStatus;
