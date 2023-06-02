@@ -129,3 +129,5 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+./backend/builds/build-win64/config.json
+./backend/config/config.js
