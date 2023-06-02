@@ -163,7 +163,7 @@ const sendCommand = async (req, res, next) => {
  * @param {number} opData.sumNonCash - сума карткою
  * @param {string} opData.uuid - унікальний id чеку 
  * @param {number} opData.cashierPassword - пароль касиру ккм
- * @param {Array.<{code: string, name: string, price: number, qty: number, tax: number, discount: number}>} opData.products - таблиця товарів для пробиття
+ * @param {Array.<{code: string, name: string, price: number, qty: number, tax: number, discount: number, uktzCode: string, exciseStamp:string}>} opData.products - таблиця товарів для пробиття
  * @returns {Object} - повертає объект з результатом
  */
 const opSaleReturn = (opData) => {
@@ -227,6 +227,12 @@ const opSaleReturn = (opData) => {
     let sumReceipt = 0;
     for (const productRow of opData.products) {
         sumReceipt += productRow.qty * productRow.price;
+        if (productRow.uktzCode) {
+            fpOleObject.CustomsCode = productRow.uktzCode;
+        }
+        if (productRow.exciseStamp) {
+            fpOleObject.ExciseStamp = productRow.exciseStamp;
+        }
         const saleRes = fpOleObject.SaleWC(productRow.code, productRow.name, productRow.tax, 1, productRow.price, productRow.qty, 0, productRow.discount, true, frAdminPassword);
         if (!checkOpResult('SaleWC', saleRes)) {
             fpOleObject.CancelReceipt(); //відміна чеку
