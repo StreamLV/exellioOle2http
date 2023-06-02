@@ -227,7 +227,7 @@ const opSaleReturn = (opData) => {
     let sumReceipt = 0;
     for (const productRow of opData.products) {
         sumReceipt += productRow.qty * productRow.price;
-        const saleRes = fpOleObject.SaleWC(productRow.code, productRow.name, productRow.tax, 1, productRow.price, productRow.qty, productRow.discount, 0, true, frAdminPassword);
+        const saleRes = fpOleObject.SaleWC(productRow.code, productRow.name, productRow.tax, 1, productRow.price, productRow.qty, 0, productRow.discount, true, frAdminPassword);
         if (!checkOpResult('SaleWC', saleRes)) {
             fpOleObject.CancelReceipt(); //відміна чеку
             fpOleObject.ClosePort();
