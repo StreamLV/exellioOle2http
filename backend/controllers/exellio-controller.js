@@ -127,7 +127,7 @@ const sendCommand = async (req, res, next) => {
     res.json(resData);
   };
 
-  const opStatus = () => {
+const opStatus = () => {
 	
 	checkSetOleDbObject();
     const workDir = {
@@ -174,7 +174,7 @@ const opSaleReturn = (opData) => {
     let receiptNumber;
     
     //////////////////////////////////////////////////////////////////////////////////////////////////
-    //openPort
+    //openReceipt
     //////////////////////////////////////////////////////////////////////////////////////////////////
     if (openPort()) {
         if (fpOleObject.IsFiscalOpen) {
@@ -226,7 +226,7 @@ const opSaleReturn = (opData) => {
     //////////////////////////////////////////////////////////////////////////////////////////////////
     let sumReceipt = 0;
     for (const productRow of opData.products) {
-        sumReceipt += productRow.qty * productRow.price;
+        sumReceipt += productRow.qty * productRow.price + productRow.discount;
         if (productRow.uktzCode) {
             fpOleObject.CustomsCode = productRow.uktzCode;
         }
